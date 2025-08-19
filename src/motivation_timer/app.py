@@ -101,7 +101,7 @@ def handle_end_of_session():
     st.rerun()
 
 # --- Main App Interface ---
-st.title("Motivation Timer 🍅")
+st.title("Motivation Timer")
 
 # Display session type and timer
 session_type = "Work Session" if st.session_state.timer['is_work_session'] else "Break Time"
