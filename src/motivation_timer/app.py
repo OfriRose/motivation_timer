@@ -1,5 +1,11 @@
 import streamlit as st
 import time
+import json
+import os
+
+# --- File path for profiles ---
+PROFILES_DIR = "motivation_timer/profiles"
+os.makedirs(PROFILES_DIR, exist_ok=True)
 
 # --- Initialize Session State with default settings ---
 if 'timer' not in st.session_state:
@@ -7,7 +13,7 @@ if 'timer' not in st.session_state:
         'running': False,
         'remaining_seconds': 25 * 60,
         'total_time': 25 * 60,
-        'is_work_session': True, # True for work, False for break
+        'is_work_session': True,
         'work_cycles_completed': 0,
         'settings': {
             "work_minutes": 25,
@@ -21,6 +27,34 @@ if 'timer' not in st.session_state:
         }
     }
 
+# --- Functions to manage profiles ---
+def save_profile(profile_name, settings):
+    """Saves the current settings to a JSON file."""
+    if not profile_name:
+        st.error("Please enter a name for the profile.")
+        return
+    file_path = os.path.join(PROFILES_DIR, f"{profile_name}.json")
+    with open(file_path, "w") as f:
+        json.dump(settings, f)
+    st.success(f"Profile '{profile_name}' saved successfully! ✅")
+
+def load_profile(profile_name):
+    """Loads settings from a JSON file."""
+    file_path = os.path.join(PROFILES_DIR, f"{profile_name}.json")
+    try:
+        with open(file_path, "r") as f:
+            st.session_state.timer['settings'] = json.load(f)
+        st.success(f"Profile '{profile_name}' loaded successfully! 📂")
+    except FileNotFoundError:
+        st.error(f"Profile '{profile_name}' not found.")
+    except Exception as e:
+        st.error(f"Error loading profile: {e}")
+    st.rerun()
+
+def get_profiles():
+    """Returns a list of available profile names."""
+    return [f.split('.')[0] for f in os.listdir(PROFILES_DIR) if f.endswith('.json')]
+
 # --- Functions to manage timer state and settings ---
 def get_total_time():
     """Calculates the total time in seconds for the current session type."""
@@ -28,7 +62,6 @@ def get_total_time():
     if st.session_state.timer['is_work_session']:
         return settings["work_minutes"] * 60 + settings["work_seconds"]
     else:
-        # Check if it's time for a long break
         if (settings["enable_long_break"] and
             st.session_state.timer['work_cycles_completed'] % settings["long_break_after"] == 0 and
             st.session_state.timer['work_cycles_completed'] > 0):
@@ -61,7 +94,7 @@ def handle_end_of_session():
     else:
         st.session_state.timer['is_work_session'] = True
         st.success("Break is over! Get back to it. 🚀")
-        
+    
     st.session_state.timer['running'] = False
     st.session_state.timer['total_time'] = get_total_time()
     st.session_state.timer['remaining_seconds'] = st.session_state.timer['total_time']
@@ -106,35 +139,35 @@ if st.session_state.timer['running']:
 with st.sidebar:
     st.header("Settings")
     
-    # Work Time Inputs
-    st.subheader("Work Time")
-    col1_work, col2_work = st.columns(2)
-    with col1_work:
-        st.session_state.timer['settings']['work_minutes'] = st.number_input("Minutes", min_value=0, value=st.session_state.timer['settings']['work_minutes'], key="work_minutes")
-    with col2_work:
-        st.session_state.timer['settings']['work_seconds'] = st.number_input("Seconds", min_value=0, max_value=59, value=st.session_state.timer['settings']['work_seconds'], key="work_seconds")
+    # Profile Management Section
+    st.subheader("User Profiles")
+    profiles = get_profiles()
+    if profiles:
+        selected_profile = st.selectbox("Load Profile", options=[""] + profiles)
+        if selected_profile:
+            load_profile(selected_profile)
     
-    # Short Break Inputs
-    st.subheader("Short Break")
-    col1_short, col2_short = st.columns(2)
-    with col1_short:
-        st.session_state.timer['settings']['short_break_minutes'] = st.number_input("Minutes", min_value=0, value=st.session_state.timer['settings']['short_break_minutes'], key="short_break_minutes")
-    with col2_short:
-        st.session_state.timer['settings']['short_break_seconds'] = st.number_input("Seconds", min_value=0, max_value=59, value=st.session_state.timer['settings']['short_break_seconds'], key="short_break_seconds")
+    profile_name_to_save = st.text_input("New Profile Name")
+    if st.button("Save Profile"):
+        save_profile(profile_name_to_save, st.session_state.timer['settings'])
 
-    # Long Break Inputs
+    # Time Settings Section
+    st.subheader("Time Settings")
+    st.session_state.timer['settings']['work_minutes'] = st.number_input("Work Minutes", min_value=0, value=st.session_state.timer['settings']['work_minutes'], key="work_minutes")
+    st.session_state.timer['settings']['work_seconds'] = st.number_input("Work Seconds", min_value=0, max_value=59, value=st.session_state.timer['settings']['work_seconds'], key="work_seconds")
+    
+    st.session_state.timer['settings']['short_break_minutes'] = st.number_input("Short Break Minutes", min_value=0, value=st.session_state.timer['settings']['short_break_minutes'], key="short_break_minutes")
+    st.session_state.timer['settings']['short_break_seconds'] = st.number_input("Short Break Seconds", min_value=0, max_value=59, value=st.session_state.timer['settings']['short_break_seconds'], key="short_break_seconds")
+
+    # Long Break Section
     st.subheader("Long Break")
     st.session_state.timer['settings']['enable_long_break'] = st.checkbox("Enable Long Break", value=st.session_state.timer['settings']['enable_long_break'])
     if st.session_state.timer['settings']['enable_long_break']:
-        col1_long, col2_long = st.columns(2)
-        with col1_long:
-            st.session_state.timer['settings']['long_break_minutes'] = st.number_input("Minutes", min_value=0, value=st.session_state.timer['settings']['long_break_minutes'], key="long_break_minutes")
-        with col2_long:
-            st.session_state.timer['settings']['long_break_seconds'] = st.number_input("Seconds", min_value=0, max_value=59, value=st.session_state.timer['settings']['long_break_seconds'], key="long_break_seconds")
+        st.session_state.timer['settings']['long_break_minutes'] = st.number_input("Long Break Minutes", min_value=0, value=st.session_state.timer['settings']['long_break_minutes'], key="long_break_minutes")
+        st.session_state.timer['settings']['long_break_seconds'] = st.number_input("Long Break Seconds", min_value=0, max_value=59, value=st.session_state.timer['settings']['long_break_seconds'], key="long_break_seconds")
         st.session_state.timer['settings']['long_break_after'] = st.number_input("After (work cycles)", min_value=1, value=st.session_state.timer['settings']['long_break_after'], key="long_break_after")
     
-    # Update button
-    if st.button("Apply Settings"):
+    if st.button("Apply Settings", use_container_width=True):
         st.session_state.timer['total_time'] = get_total_time()
         st.session_state.timer['remaining_seconds'] = st.session_state.timer['total_time']
         st.success("Settings applied! The timer is ready.")
